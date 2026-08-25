@@ -20,6 +20,8 @@ repositories {
 }
 
 dependencies {
+    // The plugin is a thin lifecycle shim over the reusable visibility library.
+    api(project(":library"))
     compileOnly(libs.org.spigotmc.spigot.api)
 }
 
