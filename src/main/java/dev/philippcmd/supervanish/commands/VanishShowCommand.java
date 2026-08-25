@@ -1,6 +1,7 @@
 package dev.philippcmd.supervanish.commands;
 
-import dev.philippcmd.supervanish.utils.VanishManager;
+import dev.philippcmd.supervanish.library.VanishService;
+import dev.philippcmd.supervanish.library.VanishTier;
 import org.bukkit.Bukkit;
 import org.bukkit.command.Command;
 import org.bukkit.command.CommandExecutor;
@@ -9,23 +10,19 @@ import org.bukkit.entity.Player;
 
 public class VanishShowCommand implements CommandExecutor {
 
-    private final VanishManager vanishManager;
+    private final VanishService vanishService;
 
-    public VanishShowCommand(VanishManager vanishManager) {
-        this.vanishManager = vanishManager;
+    public VanishShowCommand(VanishService vanishService) {
+        this.vanishService = vanishService;
     }
 
     @Override
     public boolean onCommand(CommandSender sender, Command command, String label, String[] args) {
-
-        if (!(sender instanceof Player)) {
+        if (!(sender instanceof Player player)) {
             sender.sendMessage("Only players can use this command.");
             return true;
         }
 
-        Player player = (Player) sender;
-
-        // Handle arguments
         if (args.length == 0) {
             player.sendMessage("Usage: /vanish-show <player|--all>");
             return true;
@@ -33,42 +30,34 @@ public class VanishShowCommand implements CommandExecutor {
 
         String targetName = args[0];
 
-        // Handle "--all" argument
         if (targetName.equalsIgnoreCase("--all")) {
             int count = 0;
-            for (Player vanished : Bukkit.getOnlinePlayers()) {
-                if (vanishManager.isVanished(vanished) && !vanishManager.isSuperVanished(vanished)) {
-                    vanishManager.addVanishViewer(vanished, player);
+            for (Player vanished : this.vanishService.onlineVanished()) {
+                if (this.vanishService.addViewer(vanished, player)) {
                     count++;
                 }
             }
-
             player.sendMessage("You can now see " + count + " vanished players.");
             return true;
         }
 
-        // Handle specific player argument
         Player target = Bukkit.getPlayerExact(targetName);
-
         if (target == null) {
             player.sendMessage("Player not found: " + targetName);
             return true;
         }
 
-        // Check if the target is vanished
-        if (!vanishManager.isVanished(target)) {
+        if (!this.vanishService.isVanished(target)) {
             player.sendMessage("Player " + targetName + " is not vanished.");
             return true;
         }
 
-        // Check if the target is in SuperVanish mode
-        if (vanishManager.isSuperVanished(target)) {
+        if (this.vanishService.tier(target.getUniqueId()) == VanishTier.SILENT) {
             player.sendMessage("Player " + targetName + " is in SuperVanish mode and cannot be revealed.");
             return true;
         }
 
-        // Add the player as a vanish viewer
-        vanishManager.addVanishViewer(target, player);
+        this.vanishService.addViewer(target, player);
         player.sendMessage("You can now see " + target.getName() + ".");
         return true;
     }

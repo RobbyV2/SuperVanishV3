@@ -1,6 +1,7 @@
 package dev.philippcmd.supervanish.commands;
 
-import dev.philippcmd.supervanish.utils.VanishManager;
+import dev.philippcmd.supervanish.library.VanishService;
+import dev.philippcmd.supervanish.library.VanishTier;
 import org.bukkit.command.Command;
 import org.bukkit.command.CommandExecutor;
 import org.bukkit.command.CommandSender;
@@ -8,27 +9,21 @@ import org.bukkit.entity.Player;
 
 public class VanishCommand implements CommandExecutor {
 
-    private final VanishManager vanishManager;
+    private final VanishService vanishService;
 
-    public VanishCommand(VanishManager vanishManager) {
-        this.vanishManager = vanishManager;
+    public VanishCommand(VanishService vanishService) {
+        this.vanishService = vanishService;
     }
 
     @Override
     public boolean onCommand(CommandSender sender, Command command, String label, String[] args) {
-        if (!(sender instanceof Player)) {
+        if (!(sender instanceof Player player)) {
             sender.sendMessage("Only players can use this command.");
             return true;
         }
 
-        Player player = (Player) sender;
-        boolean isVanished = vanishManager.toggleVanish(player);
-
-        if (isVanished) {
-            player.sendMessage("You are now invisible.");
-        } else {
-            player.sendMessage("You are now visible.");
-        }
+        boolean vanished = this.vanishService.toggle(player, VanishTier.NORMAL);
+        player.sendMessage(vanished ? "You are now invisible." : "You are now visible.");
         return true;
     }
 }
