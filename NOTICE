@@ -1,0 +1,44 @@
+SuperVanish
+Copyright (c) 2025 Philipp Hechler
+Copyright (c) 2026 SuperVanish contributors
+
+Licensed under the MIT License. See LICENSE.txt for the full text.
+
+--------------------------------------------------------------------------------
+About this fork
+--------------------------------------------------------------------------------
+
+This repository is a fork of https://github.com/Philippcmd/SuperVanishV3.
+
+Remotes:
+    origin      this fork
+    upstream    https://github.com/Philippcmd/SuperVanishV3
+
+The fork exists to split SuperVanish into two halves:
+
+    library/    the visibility engine, with no JavaPlugin, no plugin.yml, no
+                static singletons and no assumption that it owns a data folder.
+                Persistence is an interface (VanishStateStore) and the audience
+                rule is an interface (VanishAudience), so an embedding host
+                supplies both.
+
+    src/        the SuperVanish plugin itself, now a thin lifecycle shim that
+                builds a VanishService, wires the existing /vanish, /supervanish,
+                /vanish-show and /vanish-list commands to it, and registers the
+                library's listener.
+
+The upstream plugin behaviour is preserved: same commands, same permissions,
+same players.yml (the legacy `vanished` / `super-vanished` lists are still read
+so state survives the upgrade).
+
+--------------------------------------------------------------------------------
+Downstream use
+--------------------------------------------------------------------------------
+
+The SilentAdmin project vendors this repository as a git submodule and compiles
+only `library/` into its own Paper module. It does not load SuperVanish as a
+Bukkit plugin, does not instantiate dev.philippcmd.supervanish.Main, and does
+not register the /vanish command family or the vanish.* permission tree.
+
+The MIT copyright notice above travels with the vendored sources, which is why
+the library keeps its original package name.

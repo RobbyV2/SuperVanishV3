@@ -50,20 +50,25 @@ public final class VanishVisibilityListener implements Listener {
         this.suppressJoinQuitMessages = suppressJoinQuitMessages;
     }
 
+    // setJoinMessage/setQuitMessage rather than Paper's Component overloads: the
+    // library has to keep compiling against plain Spigot, and both servers implement
+    // the Bukkit form.
+    @SuppressWarnings("deprecation")
     @EventHandler(priority = EventPriority.HIGH)
     public void onJoin(PlayerJoinEvent event) {
         Player player = event.getPlayer();
         if (this.suppressJoinQuitMessages && this.service.isVanished(player)) {
-            event.joinMessage(null);
+            event.setJoinMessage(null);
         }
         this.service.handleJoin(player);
     }
 
+    @SuppressWarnings("deprecation")
     @EventHandler(priority = EventPriority.HIGH)
     public void onQuit(PlayerQuitEvent event) {
         Player player = event.getPlayer();
         if (this.suppressJoinQuitMessages && this.service.isVanished(player)) {
-            event.quitMessage(null);
+            event.setQuitMessage(null);
         }
         this.service.handleQuit(player);
     }

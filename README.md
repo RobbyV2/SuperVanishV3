@@ -35,3 +35,19 @@ You can find the compiled jar in `build/libs`.
 
 ## License
 The SuperVanishV3 Plugin is licensed under the MIT license. See [`LICENSE.txt`](https://github.com/Philippcmd/SuperVanishV3/blob/master/LICENSE.txt) for more info.
+
+## Repository layout
+
+This is a fork of [Philippcmd/SuperVanishV3](https://github.com/Philippcmd/SuperVanishV3),
+split into two modules:
+
+| Module     | Contents                                                                                     |
+|------------|----------------------------------------------------------------------------------------------|
+| `library/` | The visibility engine. No `JavaPlugin`, no `plugin.yml`, no singletons. Persistence and the "who may see vanished players" rule are interfaces the caller supplies. |
+| `src/`     | The SuperVanish plugin: a lifecycle shim that builds a `VanishService` and wires the existing commands to it. |
+
+Plugin behaviour is unchanged - same commands, same permissions, and `players.yml`
+is still read in its old format so existing state survives the upgrade.
+
+The split exists so the engine can also be embedded by a host that already has a
+plugin of its own and does not want a second plugin registration. See `NOTICE`.
