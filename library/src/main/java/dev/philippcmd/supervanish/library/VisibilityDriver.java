@@ -55,30 +55,31 @@ public final class VisibilityDriver {
     private final boolean unlistFromTab;
 
     /**
-     * {@code Player#setListed(boolean)} exists on Paper but not on Spigot, and is the
-     * only API that removes a player from the tab list globally (which also drops them
-     * out of most vanilla name-completion paths). Resolved once, reflectively, so the
-     * library keeps compiling and running against either.
+     * {@code Player#unlistPlayer} / {@code Player#listPlayer} are Paper-only and take
+     * the player to unlist from the caller's tab list. Resolved once, reflectively, so
+     * the library keeps compiling and running against Spigot, where the pair does not
+     * exist and tab handling falls back to what hidePlayer already does.
      */
-    private static final MethodHandle SET_LISTED = resolveSetListed();
+    private static final MethodHandle UNLIST_PLAYER = resolveListing("unlistPlayer");
+    private static final MethodHandle LIST_PLAYER = resolveListing("listPlayer");
 
     public VisibilityDriver(Plugin owner, boolean unlistFromTab) {
         this.owner = owner;
         this.unlistFromTab = unlistFromTab;
     }
 
-    private static MethodHandle resolveSetListed() {
+    private static MethodHandle resolveListing(String name) {
         try {
             return MethodHandles.publicLookup()
-                    .findVirtual(Player.class, "setListed", MethodType.methodType(void.class, boolean.class));
+                    .findVirtual(Player.class, name, MethodType.methodType(boolean.class, Player.class));
         } catch (NoSuchMethodException | IllegalAccessException e) {
             return null;
         }
     }
 
-    /** Whether this server can remove a player from the tab list globally. */
+    /** Whether this server can remove a player from another player's tab list. */
     public boolean supportsTabUnlisting() {
-        return SET_LISTED != null;
+        return UNLIST_PLAYER != null && LIST_PLAYER != null;
     }
 
     public void hideFrom(Player vanished, Player viewer) {
@@ -93,13 +94,25 @@ public final class VisibilityDriver {
         }
     }
 
-    /** Removes a player from, or restores them to, the tab list for everyone. */
-    public void setTabListed(Player player, boolean listed) {
-        if (!this.unlistFromTab || SET_LISTED == null) {
+    /**
+     * Controls whether a viewer who <em>can</em> see a vanished player also sees them in
+     * the tab list.
+     *
+     * <p>Only relevant for that case: hidePlayer already removes the player from the tab
+     * list of everyone who cannot see them. This is what makes a vanished player absent
+     * from the tab list - and from the name completion the tab list feeds - even for an
+     * authorised viewer, when the embedder asks for it.
+     */
+    public void setTabVisible(Player viewer, Player subject, boolean listed) {
+        if (viewer.equals(subject) || !supportsTabUnlisting()) {
             return;
         }
         try {
-            SET_LISTED.invoke(player, listed);
+            if (listed) {
+                LIST_PLAYER.invoke(viewer, subject);
+            } else {
+                UNLIST_PLAYER.invoke(viewer, subject);
+            }
         } catch (Throwable ignored) {
             // A server that advertises the method but rejects the call is not worth
             // failing a vanish over; the per-viewer hide above already did the work.
@@ -117,6 +130,7 @@ public final class VisibilityDriver {
             }
             if (canSee.test(viewer, vanished)) {
                 showTo(vanished, viewer);
+                setTabVisible(viewer, vanished, !this.unlistFromTab);
             } else {
                 hideFrom(vanished, viewer);
             }
@@ -131,6 +145,7 @@ public final class VisibilityDriver {
             }
             if (canSee.test(viewer, subject)) {
                 showTo(subject, viewer);
+                setTabVisible(viewer, subject, !this.unlistFromTab);
             } else {
                 hideFrom(subject, viewer);
             }
