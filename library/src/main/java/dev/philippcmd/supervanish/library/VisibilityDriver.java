@@ -120,24 +120,38 @@ public final class VisibilityDriver {
     }
 
     /**
-     * Recomputes who can see {@code vanished}. {@code canSee} receives
-     * {@code (viewer, vanished)} and decides.
+     * Recomputes who can see {@code subject}. {@code canSee} receives
+     * {@code (viewer, subject)} and decides.
+     *
+     * @param subjectVanished whether the subject is currently vanished. This decides
+     *                        whether the tab-list rule applies at all, and it has to be
+     *                        passed rather than assumed: this method is also how a player
+     *                        is <em>restored</em> - on unvanish, and on shutdown - and
+     *                        unlisting somebody who is not vanished leaves them visible
+     *                        in the world but missing from every tab list until they
+     *                        reconnect, which looks exactly like a vanish that will not
+     *                        turn off.
      */
-    public void refreshSubject(Player vanished, BiPredicate<Player, Player> canSee) {
+    public void refreshSubject(Player subject, BiPredicate<Player, Player> canSee, boolean subjectVanished) {
         for (Player viewer : Bukkit.getOnlinePlayers()) {
-            if (viewer.equals(vanished)) {
+            if (viewer.equals(subject)) {
                 continue;
             }
-            if (canSee.test(viewer, vanished)) {
-                showTo(vanished, viewer);
-                setTabVisible(viewer, vanished, !this.unlistFromTab);
+            if (canSee.test(viewer, subject)) {
+                showTo(subject, viewer);
+                setTabVisible(viewer, subject, !(this.unlistFromTab && subjectVanished));
             } else {
-                hideFrom(vanished, viewer);
+                hideFrom(subject, viewer);
             }
         }
     }
 
-    /** Recomputes what a single viewer can see, for use when that viewer joins. */
+    /**
+     * Recomputes what a single viewer can see, for use when that viewer joins.
+     *
+     * <p>{@code subjects} is the set of vanished players, so the tab-list rule applies
+     * to all of them.
+     */
     public void refreshViewer(Player viewer, Iterable<Player> subjects, BiPredicate<Player, Player> canSee) {
         for (Player subject : subjects) {
             if (subject.equals(viewer)) {

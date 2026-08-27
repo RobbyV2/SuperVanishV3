@@ -186,7 +186,7 @@ public final class VanishService {
 
     /** Pushes the stored state for one player out to every online viewer. */
     public void apply(Player subject) {
-        this.visibility.refreshSubject(subject, this::canSee);
+        this.visibility.refreshSubject(subject, this::canSee, isVanished(subject));
     }
 
     /**
@@ -225,7 +225,9 @@ public final class VanishService {
     /** Makes every vanished player visible again, for use during shutdown. */
     public void releaseAll() {
         for (Player subject : onlineVanished()) {
-            this.visibility.refreshSubject(subject, (viewer, target) -> true);
+            // Released, so no longer subject to the tab-list rule: they must be listed
+            // again, not merely shown.
+            this.visibility.refreshSubject(subject, (viewer, target) -> true, false);
         }
     }
 }
