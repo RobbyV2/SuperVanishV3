@@ -68,6 +68,11 @@ public final class VanishService {
      * stale, which for a server list is indistinguishable from being on time.
      */
     private volatile java.util.Set<UUID> snapshot = java.util.Set.of();
+
+    /** What vanishing does beyond hiding. Defaults to nothing, as this library always did. */
+    private volatile VanishBehaviour behaviour = VanishBehaviour.none();
+
+    private org.bukkit.scheduler.BukkitTask reminder;
     private final VanishAudience audience;
     private final VisibilityDriver visibility;
 
@@ -76,6 +81,63 @@ public final class VanishService {
         this.store = store;
         this.audience = audience;
         this.visibility = new VisibilityDriver(owner, unlistFromTab);
+    }
+
+    public VanishBehaviour behaviour() {
+        return this.behaviour;
+    }
+
+    /**
+     * Sets what vanishing does beyond hiding, and starts or stops the standing reminder
+     * to match.
+     */
+    public void behaviour(VanishBehaviour behaviour) {
+        this.behaviour = behaviour == null ? VanishBehaviour.none() : behaviour;
+        stopReminder();
+        if (this.behaviour.actionBarReminder()) {
+            startReminder();
+        }
+    }
+
+    /**
+     * Reminds vanished players that they are hidden.
+     *
+     * <p>Once a second, on the action bar, because the expensive mistake is forgetting:
+     * a player who thinks they are visible behaves as though they are, and gives the
+     * whole thing away in one sentence.
+     */
+    private void startReminder() {
+        try {
+            this.reminder = org.bukkit.Bukkit.getScheduler().runTaskTimer(this.owner, () -> {
+                for (Player player : onlineVanished()) {
+                    sendActionBar(player);
+                }
+            }, 20L, 20L);
+        } catch (Throwable unavailable) {
+            // A server without a scheduler here is one that is shutting down.
+        }
+    }
+
+    private void stopReminder() {
+        if (this.reminder != null) {
+            try {
+                this.reminder.cancel();
+            } catch (Throwable ignored) {
+                // Already gone.
+            }
+            this.reminder = null;
+        }
+    }
+
+    /** Action bar text, through whichever API this server offers. */
+    private static void sendActionBar(Player player) {
+        try {
+            player.spigot().sendMessage(net.md_5.bungee.api.ChatMessageType.ACTION_BAR,
+                    new net.md_5.bungee.api.chat.TextComponent(
+                            org.bukkit.ChatColor.GRAY + "You are vanished"));
+        } catch (Throwable unavailable) {
+            // No action bar on this server; the reminder is a courtesy, not a feature.
+        }
     }
 
     public Plugin owner() {
@@ -167,11 +229,21 @@ public final class VanishService {
 
     // ----------------------------------------------------------------- mutations
 
+    /**
+     * Hides a player, and - when asked - tells the server they left.
+     *
+     * <p>The announcement is the difference between a player who is invisible and a
+     * player who appears to have gone. Without it, somebody vanishing in front of others
+     * simply stops existing, which is far more conspicuous than leaving.
+     */
     public void vanish(Player player, VanishTier tier) {
         this.store.put(player.getUniqueId(), tier, System.currentTimeMillis());
         this.store.flush();
         republish();
         apply(player);
+        if (this.behaviour.fakeJoinQuit()) {
+            org.bukkit.Bukkit.broadcastMessage(VanishBehaviourListener.leaveMessage(player));
+        }
     }
 
     public void unvanish(Player player) {
@@ -179,6 +251,9 @@ public final class VanishService {
         this.store.flush();
         republish();
         apply(player);
+        if (this.behaviour.fakeJoinQuit()) {
+            org.bukkit.Bukkit.broadcastMessage(VanishBehaviourListener.joinMessage(player));
+        }
     }
 
     /** Toggles the given tier, returning true when the player ended up vanished. */
