@@ -265,12 +265,33 @@ public final class VanishBehaviourListener implements Listener {
         this.openContainers.remove(player);
     }
 
-    /** Fake join/leave text, in the server's own wording. */
+    /**
+     * Fake join/leave text, in the server's own wording.
+     *
+     * <p>Yellow, and built from the display name rather than the account name, because
+     * that is what the real message uses: on a server with nicknames a leave that named
+     * somebody differently from every other leave would be the tell it exists to avoid.
+     * The colour is restated after the name so that a nickname carrying its own
+     * formatting does not bleed into the rest of the line.
+     */
     static String joinMessage(Player player) {
-        return ChatColor.YELLOW + player.getName() + " joined the game";
+        return ChatColor.YELLOW + displayName(player) + ChatColor.YELLOW + " joined the game";
     }
 
     static String leaveMessage(Player player) {
-        return ChatColor.YELLOW + player.getName() + " left the game";
+        return ChatColor.YELLOW + displayName(player) + ChatColor.YELLOW + " left the game";
+    }
+
+    @SuppressWarnings("deprecation")
+    private static String displayName(Player player) {
+        try {
+            String display = player.getDisplayName();
+            if (display != null && !display.isBlank()) {
+                return display;
+            }
+        } catch (Throwable unavailable) {
+            // A server without the legacy accessor; the account name is right anyway.
+        }
+        return player.getName();
     }
 }
