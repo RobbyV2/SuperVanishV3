@@ -57,6 +57,17 @@ public final class VanishService {
 
     private final Plugin owner;
     private final VanishStateStore store;
+
+    /**
+     * Who is vanished, as an immutable snapshot safe to read from any thread.
+     *
+     * <p>The server answers pings on a thread of its own, so deciding whether to hide
+     * somebody from one means reading this state off the main thread while a vanish
+     * toggle may be writing it. Rather than lock the store on every read, every write
+     * republishes a copy: readers get a consistent answer that is at worst one toggle
+     * stale, which for a server list is indistinguishable from being on time.
+     */
+    private volatile java.util.Set<UUID> snapshot = java.util.Set.of();
     private final VanishAudience audience;
     private final VisibilityDriver visibility;
 
@@ -80,6 +91,25 @@ public final class VanishService {
     }
 
     // ------------------------------------------------------------------- queries
+
+    /**
+     * Whether a player is vanished, answerable from any thread.
+     *
+     * <p>{@link #isVanished(UUID)} reads the store, which belongs to the main thread.
+     * This reads the published snapshot instead.
+     */
+    public boolean isVanishedConcurrently(UUID uuid) {
+        return this.snapshot.contains(uuid);
+    }
+
+    /** Republishes the snapshot. Called on the main thread, after every change. */
+    private void republish() {
+        java.util.Set<UUID> vanished = new java.util.LinkedHashSet<>();
+        for (UUID uuid : this.store.vanished()) {
+            vanished.add(uuid);
+        }
+        this.snapshot = java.util.Set.copyOf(vanished);
+    }
 
     public boolean isVanished(UUID uuid) {
         return this.store.isVanished(uuid);
@@ -140,12 +170,14 @@ public final class VanishService {
     public void vanish(Player player, VanishTier tier) {
         this.store.put(player.getUniqueId(), tier, System.currentTimeMillis());
         this.store.flush();
+        republish();
         apply(player);
     }
 
     public void unvanish(Player player) {
         this.store.remove(player.getUniqueId());
         this.store.flush();
+        republish();
         apply(player);
     }
 
@@ -168,6 +200,7 @@ public final class VanishService {
         }
         this.store.addViewer(subjectId, viewer.getUniqueId());
         this.store.flush();
+        republish();
         apply(subject);
         return true;
     }
@@ -178,6 +211,7 @@ public final class VanishService {
         }
         this.store.removeViewer(subject.getUniqueId(), viewer.getUniqueId());
         this.store.flush();
+        republish();
         apply(subject);
         return true;
     }
