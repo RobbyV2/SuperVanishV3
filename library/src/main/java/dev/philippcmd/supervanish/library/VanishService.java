@@ -83,6 +83,25 @@ public final class VanishService {
         this.visibility = new VisibilityDriver(owner, unlistFromTab);
     }
 
+    /**
+     * Tells the room, without using the broadcast channel.
+     *
+     * <p>Sent to each player directly rather than through
+     * {@code Bukkit.broadcastMessage}, which raises an event any plugin may edit or
+     * cancel - including the host's own command-feedback scoping, which narrows the
+     * recipients of every broadcast made while an administrator's command is running.
+     * Vanishing is always such a command, so the announcement was being made to nobody.
+     * It also sidesteps the broadcast permission, which a server may have taken away.
+     */
+    private void announce(String message) {
+        if (!this.behaviour.fakeJoinQuit()) {
+            return;
+        }
+        for (Player recipient : org.bukkit.Bukkit.getOnlinePlayers()) {
+            recipient.sendMessage(message);
+        }
+    }
+
     public VanishBehaviour behaviour() {
         return this.behaviour;
     }
@@ -241,9 +260,7 @@ public final class VanishService {
         this.store.flush();
         republish();
         apply(player);
-        if (this.behaviour.fakeJoinQuit()) {
-            org.bukkit.Bukkit.broadcastMessage(VanishBehaviourListener.leaveMessage(player));
-        }
+        announce(VanishBehaviourListener.leaveMessage(player));
     }
 
     public void unvanish(Player player) {
@@ -251,9 +268,7 @@ public final class VanishService {
         this.store.flush();
         republish();
         apply(player);
-        if (this.behaviour.fakeJoinQuit()) {
-            org.bukkit.Bukkit.broadcastMessage(VanishBehaviourListener.joinMessage(player));
-        }
+        announce(VanishBehaviourListener.joinMessage(player));
     }
 
     /** Toggles the given tier, returning true when the player ended up vanished. */

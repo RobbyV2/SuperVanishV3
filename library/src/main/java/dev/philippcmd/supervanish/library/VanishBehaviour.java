@@ -54,6 +54,9 @@ package dev.philippcmd.supervanish.library;
  *                             forgetting is how a vanish is given away
  * @param hideFromPlayerList   {@code /list} does not name them
  * @param noHunger             a hidden player does not starve while doing nothing
+ * @param silenceChat          a vanished player's chat is held rather than sent, since
+ *                             speaking into a room that believes it is empty is the
+ *                             loudest way there is to undo a vanish
  */
 public record VanishBehaviour(boolean fakeJoinQuit,
                               boolean blockItemPickup,
@@ -64,16 +67,18 @@ public record VanishBehaviour(boolean fakeJoinQuit,
                               boolean silentContainers,
                               boolean actionBarReminder,
                               boolean hideFromPlayerList,
-                              boolean noHunger) {
+                              boolean noHunger,
+                              boolean silenceChat) {
 
     /** Everything on, which is what a server that asked for vanishing usually wants. */
     public static VanishBehaviour all() {
-        return new VanishBehaviour(true, true, true, true, true, true, true, true, true, true);
+        return new VanishBehaviour(true, true, true, true, true, true, true, true, true, true, true);
     }
 
     /** Nothing but invisibility, which is what this library did before. */
     public static VanishBehaviour none() {
-        return new VanishBehaviour(false, false, false, false, false, false, false, false, false, false);
+        return new VanishBehaviour(false, false, false, false, false, false, false, false, false, false,
+                false);
     }
 
     public boolean needsListener() {
