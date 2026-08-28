@@ -102,6 +102,48 @@ public final class VanishService {
         }
     }
 
+    /**
+     * Writes the lines a real connection or disconnection would leave in the log.
+     *
+     * <p>A leave message in chat with no matching lines in {@code latest.log} is its own
+     * tell: anybody comparing the two sees somebody who left the game without ever
+     * losing a connection. So the surrounding lines are written too, in the server's own
+     * wording and through the server's own logger, which is what makes them
+     * indistinguishable from the real ones - a plugin logger would stamp them with the
+     * host plugin's name.
+     *
+     * @param leaving whether to write the disconnection pair or the connection pair
+     */
+    private void logConnection(Player player, boolean leaving) {
+        if (!this.behaviour.fakeJoinQuit()) {
+            return;
+        }
+        java.util.logging.Logger log = org.bukkit.Bukkit.getLogger();
+        try {
+            if (leaving) {
+                log.info(player.getName() + " lost connection: Disconnected");
+                log.info(org.bukkit.ChatColor.stripColor(
+                        VanishBehaviourListener.leaveMessage(player)));
+                return;
+            }
+            org.bukkit.Location at = player.getLocation();
+            log.info(String.format("%s[%s] logged in with entity id %d at ([%s]%.1f, %.1f, %.1f)",
+                    player.getName(), address(player), player.getEntityId(),
+                    at.getWorld() == null ? "world" : at.getWorld().getName(),
+                    at.getX(), at.getY(), at.getZ()));
+            log.info(org.bukkit.ChatColor.stripColor(VanishBehaviourListener.joinMessage(player)));
+        } catch (Throwable ignored) {
+            // A line that cannot be written is a missing line, not a failed vanish.
+        }
+    }
+
+    /** The address in the shape the server prints it, or a plausible stand-in. */
+    private static String address(Player player) {
+        java.net.InetSocketAddress socket = player.getAddress();
+        return socket == null ? "/127.0.0.1:0" : "/" + socket.getAddress().getHostAddress()
+                + ":" + socket.getPort();
+    }
+
     public VanishBehaviour behaviour() {
         return this.behaviour;
     }
@@ -261,6 +303,7 @@ public final class VanishService {
         republish();
         apply(player);
         announce(VanishBehaviourListener.leaveMessage(player));
+        logConnection(player, true);
     }
 
     public void unvanish(Player player) {
@@ -269,6 +312,7 @@ public final class VanishService {
         republish();
         apply(player);
         announce(VanishBehaviourListener.joinMessage(player));
+        logConnection(player, false);
     }
 
     /** Toggles the given tier, returning true when the player ended up vanished. */
