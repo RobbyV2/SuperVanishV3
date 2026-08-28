@@ -53,6 +53,7 @@ public final class VisibilityDriver {
 
     private final Plugin owner;
     private final boolean unlistFromTab;
+    private boolean unlistFromOwnTab;
 
     /**
      * {@code Player#unlistPlayer} / {@code Player#listPlayer} are Paper-only and take
@@ -78,6 +79,36 @@ public final class VisibilityDriver {
     }
 
     /** Whether this server can remove a player from another player's tab list. */
+    /**
+     * Whether a vanished player is also taken out of their <em>own</em> tab list.
+     *
+     * <p>Off by default, and deliberately so: vanilla always lists you to yourself, and
+     * every other visibility operation here skips the subject for the same reason - a
+     * player hidden from their own client has no way to tell they are still connected.
+     * It exists because somebody watching over a shoulder, or a screenshot, gives the
+     * game away just as readily as another player would.
+     */
+    public void unlistFromOwnTab(boolean unlistFromOwnTab) {
+        this.unlistFromOwnTab = unlistFromOwnTab;
+    }
+
+    /** Applies that choice to the subject's own client. */
+    private void setSelfListed(Player subject, boolean listed) {
+        if (!this.unlistFromOwnTab || !supportsTabUnlisting()) {
+            return;
+        }
+        try {
+            if (listed) {
+                LIST_PLAYER.invoke(subject, subject);
+            } else {
+                UNLIST_PLAYER.invoke(subject, subject);
+            }
+        } catch (Throwable ignored) {
+            // A server that will not unlist a player from their own list keeps them in
+            // it, which is the behaviour everyone had before this option existed.
+        }
+    }
+
     public boolean supportsTabUnlisting() {
         return UNLIST_PLAYER != null && LIST_PLAYER != null;
     }
@@ -133,6 +164,7 @@ public final class VisibilityDriver {
      *                        turn off.
      */
     public void refreshSubject(Player subject, BiPredicate<Player, Player> canSee, boolean subjectVanished) {
+        setSelfListed(subject, !subjectVanished);
         for (Player viewer : Bukkit.getOnlinePlayers()) {
             if (viewer.equals(subject)) {
                 continue;
