@@ -260,11 +260,6 @@ public final class VanishBehaviourListener implements Listener {
         }
     }
 
-    /** Forgets a player's open copy, so a disconnect cannot strand it. */
-    public void forget(UUID player) {
-        this.openContainers.remove(player);
-    }
-
     /**
      * Fake join/leave text, in the server's own wording.
      *
