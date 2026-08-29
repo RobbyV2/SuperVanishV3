@@ -26,6 +26,7 @@
 package dev.philippcmd.supervanish.library;
 
 import org.bukkit.Bukkit;
+import org.bukkit.GameMode;
 import org.bukkit.entity.Player;
 import org.bukkit.plugin.Plugin;
 
@@ -35,6 +36,7 @@ import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Set;
 import java.util.UUID;
+import java.util.concurrent.ConcurrentHashMap;
 
 /**
  * The visibility engine, free of any plugin lifecycle.
@@ -71,6 +73,12 @@ public final class VanishService {
 
     /** What vanishing does beyond hiding. Defaults to nothing, as this library always did. */
     private volatile VanishBehaviour behaviour = VanishBehaviour.none();
+
+    /**
+     * Players this service turned flight on for while they are vanished, so it can turn
+     * it off again for exactly those and leave everyone else's flight alone.
+     */
+    private final Set<UUID> flightGranted = ConcurrentHashMap.newKeySet();
 
     private org.bukkit.scheduler.BukkitTask reminder;
     private final VanishAudience audience;
@@ -371,6 +379,35 @@ public final class VanishService {
     /** Pushes the stored state for one player out to every online viewer. */
     public void apply(Player subject) {
         this.visibility.refreshSubject(subject, this::canSee, isVanished(subject));
+        adjustFlight(subject);
+    }
+
+    /**
+     * Lets a vanished player fly, and puts flight back as it was when they return.
+     *
+     * <p>The server kicks a grounded player who spends too long in the air unless they
+     * are allowed to fly, and an observer drifting through walls trips exactly that. So
+     * flight is switched on for the duration of a vanish - but only when the player did
+     * not already have it, and switched off again only for those same players, so a
+     * creative-mode flier or another plugin's grant is never disturbed. What game mode
+     * implies is left untouched; this only lends flight that vanishing needs.
+     */
+    private void adjustFlight(Player subject) {
+        if (!this.behaviour.preventFlyingKick()) {
+            return;
+        }
+        UUID id = subject.getUniqueId();
+        if (isVanished(subject)) {
+            if (!subject.getAllowFlight()) {
+                subject.setAllowFlight(true);
+                this.flightGranted.add(id);
+            }
+        } else if (this.flightGranted.remove(id)) {
+            if (subject.isFlying()) {
+                subject.setFlying(false);
+            }
+            subject.setAllowFlight(false);
+        }
     }
 
     /**
@@ -412,6 +449,18 @@ public final class VanishService {
             // Released, so no longer subject to the tab-list rule: they must be listed
             // again, not merely shown.
             this.visibility.refreshSubject(subject, (viewer, target) -> true, false);
+        }
+        // Hand back the flight vanishing lent, so a survival admin does not keep it.
+        for (UUID id : Set.copyOf(this.flightGranted)) {
+            Player subject = Bukkit.getPlayer(id);
+            if (subject != null && subject.isOnline() && subject.getGameMode() != GameMode.CREATIVE
+                    && subject.getGameMode() != GameMode.SPECTATOR) {
+                if (subject.isFlying()) {
+                    subject.setFlying(false);
+                }
+                subject.setAllowFlight(false);
+            }
+            this.flightGranted.remove(id);
         }
     }
 }

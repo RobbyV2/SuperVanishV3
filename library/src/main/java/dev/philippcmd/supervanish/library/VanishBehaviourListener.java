@@ -40,6 +40,7 @@ import org.bukkit.event.entity.PlayerDeathEvent;
 import org.bukkit.event.player.PlayerAdvancementDoneEvent;
 import org.bukkit.event.player.PlayerCommandPreprocessEvent;
 import org.bukkit.event.player.PlayerInteractEvent;
+import org.bukkit.event.player.PlayerKickEvent;
 import org.bukkit.event.inventory.InventoryCloseEvent;
 import org.bukkit.event.server.ServerCommandEvent;
 import org.bukkit.command.CommandSender;
@@ -82,6 +83,56 @@ public final class VanishBehaviourListener implements Listener {
 
     private VanishBehaviour behaviour() {
         return this.service.behaviour();
+    }
+
+    // --------------------------------------------------------------- movement kicks
+
+    /**
+     * Keeps the server from kicking a vanished player for how they move.
+     *
+     * <p>A player nobody can see moves as an observer does - flying, floating, covering
+     * ground quickly - and the server, which does not know they are hidden, reads that
+     * as cheating: "flying is not enabled", "floating too long", "moved wrongly", "moved
+     * too quickly". Flight is already permitted while vanished so the flight checks never
+     * fire (see {@link VanishService}); this cancels any movement kick that still gets
+     * raised, so a vanish cannot end in a disconnect.
+     *
+     * <p>The kick's cause is read as an enum where the server offers one and matched by
+     * name, so no particular constant has to exist; the reason text is a fallback for a
+     * server that does not carry a cause. Runs late and only cancels - it never kicks.
+     */
+    @EventHandler(priority = EventPriority.HIGH, ignoreCancelled = true)
+    @SuppressWarnings("deprecation")
+    public void onKick(PlayerKickEvent event) {
+        if (!behaviour().preventFlyingKick() || !vanished(event.getPlayer())) {
+            return;
+        }
+        if (isMovementKick(event)) {
+            event.setCancelled(true);
+        }
+    }
+
+    /** Whether a kick is the server policing movement rather than anything deliberate. */
+    private static boolean isMovementKick(PlayerKickEvent event) {
+        String cause = null;
+        try {
+            Object value = event.getCause();
+            cause = value == null ? null : value.toString().toUpperCase(Locale.ROOT);
+        } catch (Throwable noCause) {
+            // Older servers expose no cause; the reason text below is enough.
+        }
+        if (cause != null && (cause.contains("FLYING") || cause.contains("FLOAT")
+                || cause.contains("MOVED") || cause.contains("INVALID"))) {
+            return true;
+        }
+        String reason = event.getReason();
+        if (reason == null) {
+            return false;
+        }
+        String text = reason.toLowerCase(Locale.ROOT);
+        return text.contains("flying is not enabled") || text.contains("floating")
+                || text.contains("moved wrongly") || text.contains("moved too quickly")
+                || text.contains("flying");
     }
 
     // ------------------------------------------------------------------- the world

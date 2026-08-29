@@ -57,6 +57,12 @@ package dev.philippcmd.supervanish.library;
  * @param silenceChat          a vanished player's chat is held rather than sent, since
  *                             speaking into a room that believes it is empty is the
  *                             loudest way there is to undo a vanish
+ * @param preventFlyingKick    a vanished player is exempt from the server's flight and
+ *                             movement kicks - "flying is not enabled", "floating too
+ *                             long", "moved wrongly", "moved too quickly" - which a
+ *                             player nobody can see, moving as an observer does, trips
+ *                             constantly; flight is permitted while hidden so the check
+ *                             never fires, and any such kick is cancelled as a backstop
  */
 public record VanishBehaviour(boolean fakeJoinQuit,
                               boolean blockItemPickup,
@@ -68,22 +74,24 @@ public record VanishBehaviour(boolean fakeJoinQuit,
                               boolean actionBarReminder,
                               boolean hideFromPlayerList,
                               boolean noHunger,
-                              boolean silenceChat) {
+                              boolean silenceChat,
+                              boolean preventFlyingKick) {
 
     /** Everything on, which is what a server that asked for vanishing usually wants. */
     public static VanishBehaviour all() {
-        return new VanishBehaviour(true, true, true, true, true, true, true, true, true, true, true);
+        return new VanishBehaviour(true, true, true, true, true, true, true, true, true, true, true, true);
     }
 
     /** Nothing but invisibility, which is what this library did before. */
     public static VanishBehaviour none() {
         return new VanishBehaviour(false, false, false, false, false, false, false, false, false, false,
-                false);
+                false, false);
     }
 
     public boolean needsListener() {
         return this.fakeJoinQuit || this.blockItemPickup || this.blockMobTargeting
                 || this.blockPhysicalContact || this.silenceDeathMessages || this.silenceAdvancements
-                || this.silentContainers || this.hideFromPlayerList || this.noHunger;
+                || this.silentContainers || this.hideFromPlayerList || this.noHunger
+                || this.preventFlyingKick;
     }
 }
