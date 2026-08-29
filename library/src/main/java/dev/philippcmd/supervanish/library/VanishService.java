@@ -298,10 +298,26 @@ public final class VanishService {
      * simply stops existing, which is far more conspicuous than leaving.
      */
     public void vanish(Player player, VanishTier tier) {
+        vanish(player, tier, true);
+    }
+
+    /**
+     * Hides a player, optionally without saying so.
+     *
+     * @param announced false when the player was never visible in the first place - a
+     *                  session that starts vanished must not be announced as having
+     *                  ended, because as far as the room is concerned it never began.
+     *                  Announcing it produces the worst of both: a player who joins and
+     *                  immediately leaves, which is more conspicuous than either.
+     */
+    public void vanish(Player player, VanishTier tier, boolean announced) {
         this.store.put(player.getUniqueId(), tier, System.currentTimeMillis());
         this.store.flush();
         republish();
         apply(player);
+        if (!announced) {
+            return;
+        }
         announce(VanishBehaviourListener.leaveMessage(player));
         logConnection(player, true);
     }
