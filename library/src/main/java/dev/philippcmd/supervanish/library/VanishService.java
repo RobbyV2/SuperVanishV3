@@ -89,6 +89,13 @@ public final class VanishService {
         this.store = store;
         this.audience = audience;
         this.visibility = new VisibilityDriver(owner, unlistFromTab);
+        // The concurrent snapshot must reflect who is already vanished the moment this
+        // engine exists, not only after the next toggle: a server restart or a reload
+        // builds a fresh engine over a store that already remembers vanished players,
+        // and until the snapshot is published the async readers - chat silencing, the
+        // server-list ping - treat those players as visible, so a vanished admin who
+        // reconnects can suddenly be seen and can speak into the room.
+        republish();
     }
 
     /**
@@ -433,6 +440,9 @@ public final class VanishService {
 
     /** Recomputes visibility for every online player, e.g. after a reload. */
     public void refreshAll() {
+        // Reconciliation runs on start and on reload, exactly when the snapshot could be
+        // out of step with the store; keep them together.
+        republish();
         Collection<Player> vanished = onlineVanished();
         Set<Player> touched = new LinkedHashSet<>(vanished);
         for (Player subject : touched) {
